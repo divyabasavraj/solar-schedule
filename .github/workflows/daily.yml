@@ -1,0 +1,35 @@
+# Daily live forecast for Pavagada (scripts/daily.py).
+# 03:30 UTC = 09:00 IST, before day-ahead gate closure. GitHub may start
+# scheduled runs late; the issue time actually used is saved with the data.
+name: daily-forecast
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-forecast
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run python scripts/daily.py
+      - name: Commit forecast
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live
+          git diff --cached --quiet && exit 0
+          git commit -m "Daily forecast $(TZ=Asia/Kolkata date +%Y-%m-%dT%H%M)"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 5; done
+          exit 1

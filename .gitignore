@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+
+# Kaggle data is not ours to redistribute: scripts/get_kaggle.py fetches it
+data/raw/kaggle/
+# DuckDB catalogue is rebuilt from the Parquet files by scripts/quality.py
+*.duckdb
+*.duckdb.wal
