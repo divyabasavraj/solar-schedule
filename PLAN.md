@@ -58,12 +58,12 @@ Plants either forecast in-house or pay a **Qualified Coordinating Agency (QCA)**
 ## 4. Data (all free)
 | Data | What it gives | Use | Status |
 |---|---|---|---|
-| **Open-Meteo Previous Runs API** | The weather forecast available **one day before** (e.g. `shortwave_radiation_previous_day1`) and what happened, hourly | The honest day-ahead input, the main source of forecast error | ✅ Tested for Pavagada (14.25 N, 77.45 E). E.g. 1 May 2025, 1 pm: forecast 919 W/m² vs actual 691 |
-| **Open-Meteo Historical Forecast API** | Archived forecasts at **15-minute** resolution | 15-min block features | ✅ Tested: 96 values per day |
-| **Open-Meteo Archive API** | Actual past weather (reanalysis), many years | "What really happened" for long backtests | ✅ Tested |
-| **Kaggle "Solar Power Generation Data"** | **Two real Indian solar plants**, 34 days, 15-min, inverter-level power + plant sensors | Calibrate the sunlight → power model; real noise and losses | ✅ Exists (Kaggle login needed; plant location not given) |
+| **Open-Meteo Previous Runs API** | Hourly forecasts as they stood 24 h (`_previous_day1`) or 48 h (`_previous_day2`) before each hour; ECMWF, GFS and ICON | The honest day-ahead input, the main source of forecast error. **Lead 1 leaks for blocks after gate closure**: `docs/DATA.md` | ✅ Pulled: from 19.01.2024 (radiation not archived earlier) |
+| **Open-Meteo Historical Forecast API** | Archived forecasts at **15-minute** resolution | 15-min block features | ✅ Pulled: 2023 → yesterday |
+| **Open-Meteo Archive API** | Actual past weather (reanalysis), many years | "What really happened" for long backtests | ✅ Pulled: 2022 → yesterday |
+| **Kaggle "Solar Power Generation Data"** | **Two real Indian solar plants**, 34 days, 15-min, inverter-level power + plant sensors | Calibrate the sunlight → power model; real noise and losses | ✅ Downloaded (git-ignored; plant location not given) |
 | **Mendeley: India demand, solar, wind (Sep 2021 – Jun 2025), Grid-India** | Real hourly all-India solar generation | Sanity-check seasonality and forecast skill on real grid output | ✅ Exists |
-| **CERC DSM Regulations, 2024** + **CERC order on X (31.03.2026)** + Third Amendment | Formula, bands, rates, trajectory | Loss calculator | ✅ Regulation read; X order and amendment text to fetch |
+| **CERC DSM Regulations, 2024** + **CERC order on X (31.03.2026)** + Third Amendment | Formula, bands, rates, trajectory | Loss calculator | ✅ All read and archived (milestone 1) |
 | Contract rate | Pavagada PPA tariff | ₹ conversion | Parameter (₹/kWh, with a sensitivity range) |
 
 **Plant output (honest labelling):** Pavagada output is **modelled**: actual site sunlight and temperature (Open-Meteo archive) → `pvlib` plant model calibrated on the Kaggle real-plant data → 15-min MWh. The README states this clearly. The forecast error studied (day-ahead weather forecast vs what happened) is real.
@@ -123,7 +123,7 @@ Full scope, nothing cut. About 15 working days across 20 Oct – 7 Nov, with 2 d
 | # | What | Dates | Done when |
 |---|---|---|---|
 | 1 ✅ | **Rules:** fetch CERC's X order and the Third Amendment, confirm X path and litigation status; build the loss calculator + unit tests (done 21 Oct; see `docs/PROJECT_LOG.md`) | 20–21 Oct | Every band × side × regime has a hand-worked test that passes; open decisions on X path, amendment and litigation are closed with citations |
-| 2 | **Data:** pull 2+ years of Open-Meteo archive + day-ahead forecasts for Pavagada; download Kaggle plant data; **start the daily cron** | 22–23 Oct | Parquet files in DuckDB with no gaps (or gaps logged); cron has run twice successfully |
+| 2 ✅ | **Data:** pull 2+ years of Open-Meteo archive + day-ahead forecasts for Pavagada; download Kaggle plant data; **start the daily cron** (done 21 Oct; first scheduled run 22 Oct 09:00 IST) | 22–23 Oct | Parquet files in DuckDB with no gaps (or gaps logged); cron has run twice successfully |
 | 3 | **Plant model:** `pvlib` calibrated on Kaggle data; data-quality report | 24 Oct | Calibration error reported; data-quality report written |
 | 4 | **Forecast ladder + walk-forward backtest** | 25–27 Oct | All 4 models backtested walk-forward; MAE/RMSE/₹ loss table by season; SHAP plot |
 | 5 | **Decision analysis:** cost to 2031, schedule optimiser, where the money goes, build vs buy, battery, aggregation, sensitivity | 28 Oct – 1 Nov | All 7 analyses have a ₹ number and a chart; the numbers for A, B, C, D, M and W in section 13 are filled in |
@@ -151,6 +151,7 @@ Starting the cron in milestone 2 means about two weeks of real live forecasts ha
 - [ ] Plant is assumed ISTS-connected (CERC DSM); if state-connected, KERC DSM 2026 would apply instead (state in README)
 - [ ] Contract rate range for Pavagada PPAs
 - [ ] Dashboard: Streamlit (proposed) vs Power BI
+- [ ] Backtest lead time: `_previous_day2` as base (honest), `_previous_day1` as optimistic bound (proposed in `docs/DATA.md`; decide in milestone 4)
 
 ## 15. Sources
 - **Primary texts, read directly and archived in `docs/sources/`; full list in `docs/RULES.md` §5**

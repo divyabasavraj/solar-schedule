@@ -1,5 +1,28 @@
 # Project log
 
+## 21 Oct 2026: Milestone 2 (data and daily cron) ✅, a day early
+**Done when:** Parquet files in DuckDB with no gaps (or gaps logged); cron has run twice successfully.
+
+- **Open-Meteo, 4.3 MB of Parquet** (`data/raw/openmeteo/`): reanalysis archive hourly 2022 → 20.10.2026; 15-min short-lead forecasts 2023 → 20.10.2026; day-ahead forecasts (leads of 1 and 2 days) for ECMWF, GFS and ICON from 19.01.2024. The archive does not go further back for radiation, so the plan's "2+ years" is about 2.75 years.
+- **Kaggle:** both plants, 136k inverter rows and 6.4k sensor rows, as Parquet (git-ignored). Plant 1's dates are DD-MM-YYYY and Plant 2's are ISO; each file is parsed with an explicit format.
+- **DuckDB:** `data/solarschedule.duckdb` holds 5 views over the Parquet files, rebuilt by `scripts/quality.py`.
+- **Gaps logged** in `docs/DATA_QUALITY.md`. No missing timestamps in any Open-Meteo grid. Null runs:
+  - ECMWF radiation starts a month after its temperature (761 h)
+  - ICON is missing 77 h from 10.04.2026
+  - GFS is missing 29 h of DNI/DHI from 18.04.2026
+  - ECMWF lead-2 is missing 129 h of cloud cover from 17.04.2026
+
+  Kaggle Plant 1 is missing 106 timestamps; Plant 2 has 904 timestamps with fewer than 22 inverters reporting. **Nothing filled**; handling is decided where the data is used.
+- **Daily cron live:** public repo github.com/divyabasavraj/solar-schedule. The `daily-forecast` workflow runs at 03:30 UTC (09:00 IST), saves 15-min and hourly forecasts for 3 models, checks that tomorrow has 96 complete blocks, and commits to `data/live/`. **2 successful runs** (manual dispatch, 20:12 and 20:13 IST) plus 1 failure, caused by a bad action tag and fixed in the next commit. The first *scheduled* run is 22 Oct 09:00 IST. The two evening runs were issued after gate closure: keep them out of any day-ahead scoring (`issued_at_ist` is recorded).
+- **12 new tests** (73 in total) for parsing, trimming, gap runs, retries and DuckDB views. All offline.
+- **Found a leakage trap** (`docs/DATA.md`, "Lead time"). `_previous_day1` is the forecast made 24 h before each hour, which for afternoon blocks is *after* a 09:00 gate closure the day before. Proposed: lead 2 as the base case, lead 1 as the optimistic bound.
+
+**Carried forward**
+- Check on 22–23 Oct that the scheduled runs fire (GitHub can delay or skip scheduled runs).
+- Milestone 3 must handle the Kaggle inverter dropouts (scale by inverters reporting) and the interval-end time labels (sun position at the interval midpoint).
+
+**Next: milestone 3 (24 Oct, can start 22 Oct).** pvlib plant model calibrated on Kaggle data.
+
 ## 20–21 Oct 2026: Milestone 1 (rules and loss calculator) ✅
 **Done when:** every band × side × regime has a hand-worked test that passes; open decisions on X path, amendment and litigation are closed with citations.
 
