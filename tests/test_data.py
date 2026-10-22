@@ -165,3 +165,23 @@ def test_build_db_creates_views_only_for_present_sources(tmp_path, monkeypatch):
 
     with duckdb.connect(str(tmp_path / "t.duckdb"), read_only=True) as con:
         assert con.execute("SELECT sum(shortwave_radiation) FROM archive_hourly").fetchone()[0] == 5.0
+
+
+# --- daily job: once per day -------------------------------------------------
+
+
+def test_daily_once_skips_only_after_a_pre_gate_run(tmp_path):
+    import importlib.util
+    from datetime import date
+
+    spec = importlib.util.spec_from_file_location("daily", store.ROOT / "scripts" / "daily.py")
+    daily = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(daily)
+
+    day = date(2026, 10, 22)
+    assert not daily.done_today(day, tmp_path)
+    (tmp_path / "2026-10-21T0850").mkdir()  # yesterday's run does not count
+    (tmp_path / "2026-10-22T1315").mkdir()  # late catch-up run does not count
+    assert not daily.done_today(day, tmp_path)
+    (tmp_path / "2026-10-22T0900").mkdir()  # at the gate counts
+    assert daily.done_today(day, tmp_path)

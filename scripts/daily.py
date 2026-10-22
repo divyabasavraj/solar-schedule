@@ -10,11 +10,16 @@ really have used. Each run gets its own folder, named by its IST issue time:
 and appends one line to data/live/runs.csv. Turning these into a schedule
 and scoring them against what happened is milestone 6.
 
-    uv run python scripts/daily.py
+GitHub can drop scheduled runs (it skipped the first one, 22 Oct), so the
+workflow fires several times before the gate. With --once, a run exits
+quietly if today already has a forecast issued before GATE.
+
+    uv run python scripts/daily.py [--once]
 """
 
 import csv
-from datetime import datetime
+import sys
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -23,10 +28,22 @@ from solarschedule import openmeteo as om
 from solarschedule.store import LIVE, write
 
 IST = ZoneInfo(om.TZ)
+GATE = time(9, 0)  # IST; day-ahead schedule cut-off assumed throughout (docs/DATA.md)
+
+
+def done_today(day, forecast_dir=LIVE / "forecast") -> bool:
+    """True if a run for `day` was issued at or before GATE."""
+    for d in forecast_dir.glob(f"{day:%Y-%m-%d}T*"):
+        if datetime.strptime(d.name, "%Y-%m-%dT%H%M").time() <= GATE:
+            return True
+    return False
 
 
 def main() -> None:
     issued = datetime.now(IST).replace(second=0, microsecond=0)
+    if "--once" in sys.argv[1:] and done_today(issued.date()):
+        print(f"already have a pre-gate forecast for {issued.date()}; skipping")
+        return
     folder = LIVE / "forecast" / issued.strftime("%Y-%m-%dT%H%M")
     m15, hourly = [], []
     for m in om.MODELS:

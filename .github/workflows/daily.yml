@@ -1,11 +1,16 @@
 # Daily live forecast for Pavagada (scripts/daily.py).
-# 03:30 UTC = 09:00 IST, before day-ahead gate closure. GitHub may start
-# scheduled runs late; the issue time actually used is saved with the data.
+# Three tries before the 09:00 IST gate (07:17, 08:13, 08:43 IST), off the
+# top of the hour, because GitHub delays or drops scheduled runs: the first
+# one, 22 Oct, never fired. Scheduled runs pass --once, so only the first to
+# succeed saves a forecast; a manual dispatch always runs. The issue time
+# actually used is saved with the data.
 name: daily-forecast
 
 on:
   schedule:
-    - cron: "30 3 * * *"
+    - cron: "47 1 * * *"
+    - cron: "43 2 * * *"
+    - cron: "13 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -23,7 +28,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --frozen
-      - run: uv run python scripts/daily.py
+      - run: uv run python scripts/daily.py ${{ github.event_name == 'schedule' && '--once' || '' }}
       - name: Commit forecast
         run: |
           git config user.name "github-actions[bot]"
