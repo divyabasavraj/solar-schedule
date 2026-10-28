@@ -7,7 +7,7 @@
 - Data sources and caveats: [`docs/DATA.md`](docs/DATA.md), gaps in [`docs/DATA_QUALITY.md`](docs/DATA_QUALITY.md)
 - Progress: [`docs/PROJECT_LOG.md`](docs/PROJECT_LOG.md); where AI was wrong: [`docs/AI_LOG.md`](docs/AI_LOG.md)
 
-A GitHub Actions job saves the day's forecast at 09:00 IST every day (`data/live/`).
+A GitHub Actions job saves the day's forecast before the 09:00 IST gate every day (tries from 01:17 IST, as GitHub delays scheduled runs by hours) (`data/live/`).
 
 ```
 uv sync

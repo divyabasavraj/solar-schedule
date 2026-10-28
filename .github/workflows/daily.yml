@@ -1,16 +1,21 @@
 # Daily live forecast for Pavagada (scripts/daily.py).
-# Three tries before the 09:00 IST gate (07:17, 08:13, 08:43 IST), off the
-# top of the hour, because GitHub delays or drops scheduled runs: the first
-# one, 22 Oct, never fired. Scheduled runs pass --once, so only the first to
-# succeed saves a forecast; a manual dispatch always runs. The issue time
-# actually used is saved with the data.
+# GitHub delays scheduled runs on this repo by 4.5-5.5 h (23-27 Oct: crons
+# set for 07:17-08:43 IST fired at 12:01-14:28 IST, all after the 09:00 IST
+# gate; 22 Oct never fired). So the tries are set in the small hours IST
+# (01:17, 02:13, 03:43, 05:13), where even a 5.5 h delay lands before the
+# gate. All are after 00:00 IST, so a run's IST date is the issue day.
+# Scheduled runs pass --once, so only the first to succeed before the gate
+# saves a forecast; later ones exit. If every try misses the gate, the first
+# late one still saves (flagged by its issue time). A manual dispatch always
+# runs. The issue time actually used is saved with the data.
 name: daily-forecast
 
 on:
   schedule:
-    - cron: "47 1 * * *"
-    - cron: "43 2 * * *"
-    - cron: "13 3 * * *"
+    - cron: "47 19 * * *"
+    - cron: "43 20 * * *"
+    - cron: "13 22 * * *"
+    - cron: "43 23 * * *"
   workflow_dispatch:
 
 permissions:

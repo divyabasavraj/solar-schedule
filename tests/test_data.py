@@ -170,18 +170,20 @@ def test_build_db_creates_views_only_for_present_sources(tmp_path, monkeypatch):
 # --- daily job: once per day -------------------------------------------------
 
 
-def test_daily_once_skips_only_after_a_pre_gate_run(tmp_path):
+def test_daily_once_skips_after_pre_gate_run_or_one_late_run(tmp_path):
     import importlib.util
-    from datetime import date
+    from datetime import datetime
 
     spec = importlib.util.spec_from_file_location("daily", store.ROOT / "scripts" / "daily.py")
     daily = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(daily)
 
-    day = date(2026, 10, 22)
-    assert not daily.done_today(day, tmp_path)
+    early, late = datetime(2026, 10, 22, 4, 0), datetime(2026, 10, 22, 13, 0)
+    assert not daily.done_today(early, tmp_path)
+    assert not daily.done_today(late, tmp_path)  # nothing yet: late fallback runs
     (tmp_path / "2026-10-21T0850").mkdir()  # yesterday's run does not count
-    (tmp_path / "2026-10-22T1315").mkdir()  # late catch-up run does not count
-    assert not daily.done_today(day, tmp_path)
-    (tmp_path / "2026-10-22T0900").mkdir()  # at the gate counts
-    assert daily.done_today(day, tmp_path)
+    assert not daily.done_today(late, tmp_path)
+    (tmp_path / "2026-10-22T1215").mkdir()  # one late run is enough after the gate
+    assert daily.done_today(late, tmp_path)
+    (tmp_path / "2026-10-22T0900").mkdir()  # at the gate counts at any time
+    assert daily.done_today(early, tmp_path)

@@ -1,7 +1,7 @@
 """Daily live job: save the latest forecast for Pavagada as it stands now.
 
-Run by .github/workflows/daily.yml at 09:00 IST, before day-ahead gate
-closure, so the forecast for tomorrow's 96 blocks is one a scheduler could
+Run by .github/workflows/daily.yml in the small hours IST, before the 09:00
+IST day-ahead gate closure, so the forecast for tomorrow's 96 blocks is one a scheduler could
 really have used. Each run gets its own folder, named by its IST issue time:
 
     data/live/forecast/2026-10-22T0900/minutely_15.parquet
@@ -10,9 +10,10 @@ really have used. Each run gets its own folder, named by its IST issue time:
 and appends one line to data/live/runs.csv. Turning these into a schedule
 and scoring them against what happened is milestone 6.
 
-GitHub can drop scheduled runs (it skipped the first one, 22 Oct), so the
-workflow fires several times before the gate. With --once, a run exits
-quietly if today already has a forecast issued before GATE.
+GitHub delays scheduled runs by hours and sometimes drops them, so the
+workflow fires several times. With --once, a run exits quietly if today
+already has a forecast issued before GATE, or if it is past GATE and today
+already has any forecast (one late fallback a day is enough).
 
     uv run python scripts/daily.py [--once]
 """
@@ -31,18 +32,18 @@ IST = ZoneInfo(om.TZ)
 GATE = time(9, 0)  # IST; day-ahead schedule cut-off assumed throughout (docs/DATA.md)
 
 
-def done_today(day, forecast_dir=LIVE / "forecast") -> bool:
-    """True if a run for `day` was issued at or before GATE."""
-    for d in forecast_dir.glob(f"{day:%Y-%m-%d}T*"):
-        if datetime.strptime(d.name, "%Y-%m-%dT%H%M").time() <= GATE:
-            return True
-    return False
+def done_today(now, forecast_dir=LIVE / "forecast") -> bool:
+    """True if today needs no more runs: one was issued at or before GATE,
+    or `now` is past GATE and any run exists for today."""
+    times = [datetime.strptime(d.name, "%Y-%m-%dT%H%M").time()
+             for d in forecast_dir.glob(f"{now:%Y-%m-%d}T*")]
+    return any(t <= GATE for t in times) or (now.time() > GATE and bool(times))
 
 
 def main() -> None:
     issued = datetime.now(IST).replace(second=0, microsecond=0)
-    if "--once" in sys.argv[1:] and done_today(issued.date()):
-        print(f"already have a pre-gate forecast for {issued.date()}; skipping")
+    if "--once" in sys.argv[1:] and done_today(issued):
+        print(f"already have today's forecast ({issued.date()}); skipping")
         return
     folder = LIVE / "forecast" / issued.strftime("%Y-%m-%dT%H%M")
     m15, hourly = [], []
