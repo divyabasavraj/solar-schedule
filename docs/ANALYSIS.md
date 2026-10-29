@@ -6,15 +6,15 @@ Base case: lead-2 forecasts, 839 days (01 Jul 2024 – 19 Oct 2026), notified ru
 
 Optimiser columns: a percentile per season, or one percentile all year, both chosen on the selection period for each year's rules.
 
-| FY                  |   X % |   NWP -> plant (free) |   GBM median |   GBM + optimiser |   GBM + one percentile | percentile   |
-|:--------------------|------:|----------------------:|-------------:|------------------:|-----------------------:|:-------------|
-| FY25-26 (old bands) |   100 |                 173.2 |        111   |             nan   |                  nan   |              |
-| FY26-27             |   100 |                 315.8 |        202.5 |             201.2 |                  202.5 | q50          |
-| FY27-28             |    90 |                 334.2 |        212.2 |             211.2 |                  212.2 | q50          |
-| FY28-29             |    75 |                 364.9 |        228.2 |             230.6 |                  228.2 | q50          |
-| FY29-30             |    55 |                 412.7 |        253   |             251.5 |                  253   | q50          |
-| FY30-31             |    30 |                 488.3 |        291.5 |             281.9 |                  291.5 | q50          |
-| FY31-32             |     0 |                 607.3 |        359.5 |             355.6 |                  359.5 | q50          |
+| FY                  |   X % |   NWP → plant (free) |   GBM median |   GBM + optimiser |   GBM + one percentile | percentile   |
+|:--------------------|------:|---------------------:|-------------:|------------------:|-----------------------:|:-------------|
+| FY25-26 (old bands) |   100 |                173.2 |        111   |             nan   |                  nan   |              |
+| FY26-27             |   100 |                315.8 |        202.5 |             201.2 |                  202.5 | q50          |
+| FY27-28             |    90 |                334.2 |        212.2 |             211.2 |                  212.2 | q50          |
+| FY28-29             |    75 |                364.9 |        228.2 |             230.6 |                  228.2 | q50          |
+| FY29-30             |    55 |                412.7 |        253   |             251.5 |                  253   | q50          |
+| FY30-31             |    30 |                488.3 |        291.5 |             281.9 |                  291.5 | q50          |
+| FY31-32             |     0 |                607.3 |        359.5 |             355.6 |                  359.5 | q50          |
 
 ## 2. Schedule optimiser: loss-minimising percentile, chosen on Jul 2024 – Jun 2025
 
@@ -56,6 +56,8 @@ By hour of day (IST, block start):
 |     18 |       0   |       0.3 |
 |     19 |       0   |       0   |
 
+Shoulder hours (before 09:00 and from 15:00): 15.4% of loss under FY26-27 rules; 31.8% of loss under FY31-32 rules.
+
 Blocks scheduled below 20 MW: 4.0% of energy, 0.6% of loss in FY26-27; 6.3% of loss in FY31-32.
 
 By season: monsoon: 62.4; post-monsoon: 19.3; summer: 7.5; winter: 10.7 (FY31-32).
@@ -64,13 +66,13 @@ By season: monsoon: 62.4; post-monsoon: 19.3; summer: 7.5; winter: 10.7 (FY31-32
 
 Annual loss by forecasting step (out-of-sample):
 
-| model               |   FY26-27 |   FY28-29 |   FY31-32 |
-|:--------------------|----------:|----------:|----------:|
-| Persistence         |     506.9 |     546.6 |     712.9 |
-| Clear-sky x cloud   |     709.1 |     776.7 |    1069.2 |
-| NWP -> plant (free) |     315.8 |     364.9 |     607.3 |
-| GBM median          |     202.5 |     228.2 |     359.5 |
-| GBM + optimiser     |     201.2 |     230.6 |     355.6 |
+| model              |   FY26-27 |   FY28-29 |   FY31-32 |
+|:-------------------|----------:|----------:|----------:|
+| Persistence        |     506.9 |     546.6 |     712.9 |
+| Clear-sky x cloud  |     709.1 |     776.7 |    1069.2 |
+| NWP → plant (free) |     315.8 |     364.9 |     607.3 |
+| GBM median         |     202.5 |     228.2 |     359.5 |
+| GBM + optimiser    |     201.2 |     230.6 |     355.6 |
 
 What a QCA is worth if its error is X% smaller than ours (schedule moved that much closer to actual in every block). The fee ceiling is the saving per MW per month; a QCA charging more is not worth it:
 
@@ -81,15 +83,29 @@ What a QCA is worth if its error is X% smaller than ours (schedule moved that mu
 | 20%                      |                       79.8 |                              6650 |                      102.3 |                              8520 |
 | 30%                      |                      113.8 |                              9480 |                      150.4 |                             12530 |
 
+**Break-even (W):** at ₹3,870/MW/month (GSECL's 2021 QCA tender estimate, the only public per-MW figure), a QCA must cut our error by 11% (FY26-27); 11% (FY27-28); 11% (FY28-29); 10% (FY29-30); 10% (FY30-31); 9% (FY31-32). The bar falls as X falls, because each MWh of error costs more.
+
 ## 5. Battery that absorbs deviations
 
 Net ₹ lakh/yr avoided (loss avoided minus energy lost at 88% round trip), 2-hour battery behind the meter, GBM + optimiser schedule. Cost: annual lease at standalone-BESS tender tariffs of ₹1.48–2.1 lakh/MW/month. The battery earns nothing else here (no arbitrage), so this is the deviation case alone.
 
-| battery        |   FY26-27 |   FY27-28 |   FY28-29 |   FY29-30 |   FY30-31 |   FY31-32 | lease cost ₹ lakh/yr   | first FY savings ≥ low cost   |
-|:---------------|----------:|----------:|----------:|----------:|----------:|----------:|:-----------------------|:------------------------------|
-| 5 MWh / 2.5 MW |      12.1 |      13   |      12.1 |      14   |      17.3 |      22.4 | 44–63                  | not by FY31-32                |
-| 10 MWh / 5 MW  |      21.7 |      23.2 |      21.4 |      24.8 |      30.4 |      36.8 | 89–126                 | not by FY31-32                |
-| 20 MWh / 10 MW |      37.1 |      39.9 |      36.7 |      41.8 |      50.3 |      57.4 | 178–252                | not by FY31-32                |
+| battery        |   FY26-27 |   FY27-28 |   FY28-29 |   FY29-30 |   FY30-31 |   FY31-32 | lease cost ₹ lakh/yr   | first FY savings ≥ low cost   |   break-even lease FY31-32, ₹ lakh/MW/month |
+|:---------------|----------:|----------:|----------:|----------:|----------:|----------:|:-----------------------|:------------------------------|--------------------------------------------:|
+| 5 MWh / 2.5 MW |      12.1 |      13   |      12.1 |      14   |      17.3 |      22.4 | 44–63                  | not by FY31-32                |                                        0.75 |
+| 10 MWh / 5 MW  |      21.7 |      23.2 |      21.4 |      24.8 |      30.4 |      36.8 | 89–126                 | not by FY31-32                |                                        0.61 |
+| 20 MWh / 10 MW |      37.1 |      39.9 |      36.7 |      41.8 |      50.3 |      57.4 | 178–252                | not by FY31-32                |                                        0.48 |
+
+**Payback (M):** the 10 MWh battery does not pay back by FY31-32. Even at X = 0 it covers its lease only if storage falls to ₹0.61 lakh/MW/month, about 41% of today's lowest tender. It needs a second income (arbitrage, ancillary services) to make sense.
+
+## 6. Aggregation with a neighbouring 100 MW plant (Note-2 pooling)
+
+Neighbour modelled 25 km south-west (a different Open-Meteo grid cell; `scripts/neighbour.py`), GBM median schedules, 472 out-of-sample days. Correlation of the two plants' forecast errors: 0.83. A real pooling-station neighbour is closer, so its errors are more alike and the saving smaller: read this as an upper bound.
+
+| FY      |   two plants alone |   pooled via QCA |   saved % |
+|:--------|-------------------:|-----------------:|----------:|
+| FY26-27 |              412.7 |            374   |       9.4 |
+| FY28-29 |              463.7 |            421.4 |       9.1 |
+| FY31-32 |              723.5 |            668.3 |       7.6 |
 
 ## 7. Sensitivity (GBM median schedule, ₹ lakh/yr)
 

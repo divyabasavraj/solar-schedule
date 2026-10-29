@@ -18,6 +18,7 @@ import pandas as pd
 
 from solarschedule import charts, decide
 from solarschedule.loss import pool, settle
+from solarschedule.plant import CAPACITY_MW
 from solarschedule.rules import CERC_2014, CERC_2024_PRE_APR2026, solar_regime_for_fy
 from solarschedule.store import DATA, ROOT
 
@@ -158,8 +159,13 @@ def main() -> None:
         by_season = bl.groupby(r_test.season).sum() / bl.sum() * 100
         head[f"season_share_{fy}"] = by_season.round(1).to_dict()
     sh = pd.DataFrame(share).loc[5:19].round(1)
+    shoulders = list(range(5, 9)) + list(range(15, 20))  # before 09:00 and from 15:00
+    sh_share = {fy: round(float(pd.DataFrame(share)[fy].loc[shoulders].sum()), 1) for fy in share}
+    head["shoulder_loss_share"] = sh_share
     md += ["## 3. Where the money goes (share of annual loss, %, GBM + optimiser)", "",
            "By hour of day (IST, block start):", "", sh.reset_index().to_markdown(index=False), "",
+           "Shoulder hours (before 09:00 and from 15:00): "
+           + "; ".join(f"{v}% of loss under {k} rules" for k, v in sh_share.items()) + ".", "",
            f"Blocks scheduled below 20 MW: {head['low_block_energy_share_2026']}% of energy, "
            f"{head['low_block_loss_share_2026']}% of loss in FY26-27; "
            f"{head['low_block_loss_share_2031']}% of loss in FY31-32.", "",
@@ -172,8 +178,9 @@ def main() -> None:
     ax.set_xlabel("Hour of day (IST)", color=charts.INK_2)
     ax.set_ylabel("% of annual loss", color=charts.INK_2)
     ax.legend(frameon=False, fontsize=9)
-    charts.title(ax, "At X = 0 the losses move to the shoulders of the day",
-                 "Share of annual deviation loss by hour, GBM + optimiser schedule")
+    a, b = sh_share.values()
+    charts.title(ax, f"At X = 0 the shoulder hours' share of loss goes from {a:.0f}% to {b:.0f}%",
+                 "Share of annual deviation loss by hour, GBM + optimiser schedule; midday still costs most")
     charts.save(fig, FIG / "where_money_goes.png")
 
     # 4. build vs buy -------------------------------------------------------------
@@ -184,24 +191,53 @@ def main() -> None:
     ladder.append({"model": LADDER["opt"]} | {fy_label(fy): decide.annual_loss_lakh(r_test, opt[fy][test].to_numpy(), regs[fy])
                                               for fy in (2026, 2028, 2031)})
     lad = pd.DataFrame(ladder).round(1)
+    def fee_ceiling(saved_lakh: float) -> float:  # Rs per MW per month
+        return saved_lakh * 1e5 / CAPACITY_MW / 12
+
     qca = []
     for cut in (5, 10, 20, 30):
         row = {"error cut vs our model": f"{cut}%"}
         for fy in (2026, 2031):
-            s = opt[fy][test].to_numpy()
-            better = r_test.actual + (1 - cut / 100) * (s - r_test.actual)
-            saved = decide.annual_loss_lakh(r_test, s, regs[fy]) - decide.annual_loss_lakh(r_test, better, regs[fy])
+            saved = decide.qca_saving(r_test, opt[fy][test], regs[fy], cut / 100)
             row[f"saved {fy_label(fy)}, ₹ lakh/yr"] = round(saved, 1)
-            row[f"max QCA fee {fy_label(fy)}, ₹/MW/month"] = round(saved * 1e5 / 100 / 12, -1)
+            row[f"max QCA fee {fy_label(fy)}, ₹/MW/month"] = round(fee_ceiling(saved), -1)
         qca.append(row)
     qca = pd.DataFrame(qca)
+    fee = decide.QCA_FEE_RS_PER_MW_MONTH
+    w = {fy: decide.qca_breakeven_cut(r_test, opt[fy][test], regs[fy]) * 100 for fy in FYS}
     head["qca_fee_ceiling_10pct_fy27"] = float(qca.iloc[1, 2])
     head["qca_fee_ceiling_10pct_fy32"] = float(qca.iloc[1, 4])
+    head["qca_fee_rs_per_mw_month"] = fee
+    head["W_qca_breakeven_cut_pct"] = {fy_label(fy): round(v, 1) for fy, v in w.items()}
     md += ["## 4. Build vs buy", "", "Annual loss by forecasting step (out-of-sample):", "",
            lad.to_markdown(index=False), "",
            "What a QCA is worth if its error is X% smaller than ours (schedule moved that much closer to actual "
            "in every block). The fee ceiling is the saving per MW per month; a QCA charging more is not worth it:", "",
-           qca.to_markdown(index=False), ""]
+           qca.to_markdown(index=False), "",
+           f"**Break-even (W):** at ₹{fee:,}/MW/month (GSECL's 2021 QCA tender estimate, the only public per-MW "
+           "figure), a QCA must cut our error by "
+           + "; ".join(f"{v:.0f}% ({k})" for k, v in head["W_qca_breakeven_cut_pct"].items())
+           + ". The bar falls as X falls, because each MWh of error costs more.", ""]
+    cuts = np.linspace(0, 0.4, 17)
+    fig, ax = charts.figure()
+    for i, fy in enumerate((2026, 2031)):
+        s = opt[fy][test]
+        ax.plot(cuts * 100, [fee_ceiling(decide.qca_saving(r_test, s, regs[fy], c)) for c in cuts],
+                lw=2, color=charts.SERIES[i], label=fy_label(fy) + " rules")
+        ax.plot(w[fy], fee, "o", ms=6, color=charts.SERIES[i])
+        ax.annotate(f"W = {w[fy]:.0f}%", (w[fy], fee), xytext=(-8, 8) if i else (8, -14), textcoords="offset points",
+                    ha="right" if i else "left", fontsize=9, color=charts.INK_2)
+    ax.axhline(fee, color=charts.MUTED, lw=1, ls="--")
+    ax.text(39.5, fee, f"QCA fee ₹{fee:,}/MW/month (GSECL 2021 tender)", fontsize=8, color=charts.INK_2,
+            va="bottom", ha="right")
+    ax.set_xlabel("QCA error, % smaller than ours", color=charts.INK_2)
+    ax.set_ylabel("Fee the saving pays for, ₹/MW/month", color=charts.INK_2)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(0, 40)
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    charts.title(ax, "A QCA pays only if it beats our model's error by about a tenth",
+                 "What a better forecast is worth per MW per month, GBM + optimiser as the baseline")
+    charts.save(fig, FIG / "build_vs_buy.png")
 
     # 5. battery ----------------------------------------------------------------------
     brows = []
@@ -218,15 +254,26 @@ def main() -> None:
         row["lease cost ₹ lakh/yr"] = f"{lo:.0f}–{hi:.0f}"
         pays = [fy_label(fy) for fy in FYS if row[fy_label(fy)] >= lo]
         row["first FY savings ≥ low cost"] = pays[0] if pays else "not by FY31-32"
+        mw = e / decide.BESS_HOURS
+        row["break-even lease FY31-32, ₹ lakh/MW/month"] = round(row[fy_label(FYS[-1])] / (mw * 12), 2)
         brows.append(row)
     bat = pd.DataFrame(brows)
     head["battery"] = bat.to_dict(orient="records")
+    ten = brows[1]
+    head["M_battery_10mwh_payback"] = ten["first FY savings ≥ low cost"]
+    head["battery_10mwh_breakeven_lease"] = ten["break-even lease FY31-32, ₹ lakh/MW/month"]
     md += ["## 5. Battery that absorbs deviations", "",
            f"Net ₹ lakh/yr avoided (loss avoided minus energy lost at {decide.ROUND_TRIP:.0%} round trip), "
            "2-hour battery behind the meter, GBM + optimiser schedule. Cost: annual lease at standalone-BESS tender "
            f"tariffs of ₹{decide.BESS_RS_LAKH_PER_MW_MONTH[0]}–{decide.BESS_RS_LAKH_PER_MW_MONTH[1]} lakh/MW/month. "
            "The battery earns nothing else here (no arbitrage), so this is the deviation case alone.", "",
-           bat.to_markdown(index=False), ""]
+           bat.to_markdown(index=False), "",
+           "**Payback (M):** the 10 MWh battery "
+           + ("does not pay back by FY31-32" if ten["first FY savings ≥ low cost"].startswith("not")
+              else f"pays back from {ten['first FY savings ≥ low cost']}") + ". Even at X = 0 it "
+           f"covers its lease only if storage falls to ₹{ten['break-even lease FY31-32, ₹ lakh/MW/month']} lakh/MW/month, "
+           f"about {ten['break-even lease FY31-32, ₹ lakh/MW/month'] / decide.BESS_RS_LAKH_PER_MW_MONTH[0]:.0%} of "
+           "today's lowest tender. It needs a second income (arbitrage, ancillary services) to make sense.", ""]
     fig, ax = charts.figure()
     for i, row in enumerate(brows):
         vals = [row[fy_label(fy)] for fy in FYS]
@@ -261,11 +308,28 @@ def main() -> None:
                          "saved %": round((1 - pooled / alone) * 100, 1)})
         corr = float(np.corrcoef(both.actual - both.q50, both.actual_n - both.q50_n)[0, 1])
         head["pooling"] = arow
+        head["pooling_error_corr"] = round(corr, 2)
         md += ["## 6. Aggregation with a neighbouring 100 MW plant (Note-2 pooling)", "",
                "Neighbour modelled 25 km south-west (a different Open-Meteo grid cell; `scripts/neighbour.py`), "
-               f"GBM median schedules. Correlation of the two plants' forecast errors: {corr:.2f}. "
+               f"GBM median schedules, {both.day.nunique()} out-of-sample days. "
+               f"Correlation of the two plants' forecast errors: {corr:.2f}. "
                "A real pooling-station neighbour is closer, so its errors are more alike and the saving smaller: "
                "read this as an upper bound.", "", pd.DataFrame(arow).to_markdown(index=False), ""]
+        fig, ax = charts.figure()
+        x = np.arange(len(arow))
+        for i, (col, lab) in enumerate([("two plants alone", "Each plant settled alone"),
+                                        ("pooled via QCA", "Pooled through a QCA")]):
+            vals = [r[col] for r in arow]
+            ax.bar(x + (i - 0.5) * 0.38, vals, width=0.34, color=charts.SERIES[i], label=lab)
+        for k, r in enumerate(arow):
+            ax.annotate(f"−{r['saved %']:.0f}%", (x[k] + 0.19, r["pooled via QCA"]), xytext=(0, 4),
+                        textcoords="offset points", ha="center", fontsize=9, color=charts.INK_2)
+        ax.set_xticks(x, [r["FY"] for r in arow])
+        ax.set_ylabel("₹ lakh per year, both plants", color=charts.INK_2)
+        ax.legend(frameon=False, fontsize=9, loc="upper left")
+        charts.title(ax, "Pooling with a neighbour nets out part of the error",
+                     f"Two 100 MW plants 25 km apart, error correlation {corr:.2f}; an upper bound")
+        charts.save(fig, FIG / "aggregation.png")
 
     # 7. sensitivity -------------------------------------------------------------------------
     sens = []
@@ -285,6 +349,18 @@ def main() -> None:
     md += ["## 7. Sensitivity (GBM median schedule, ₹ lakh/yr)", "", sens.to_markdown(index=False), "",
            "Loss is linear in the contract rate. The Third Amendment (Reg 8(4A)) does not apply to this plant; "
            "a plant bid from 2027 would face General Seller charges instead.", ""]
+    fig, ax = charts.figure()
+    fx = [fy_label(fy) for fy in FYS]
+    for i, row in sens.iterrows():
+        ax.plot(range(len(FYS)), row[fx].astype(float), marker="o", ms=4, lw=2.5 if i == 0 else 1.5,
+                color=charts.SERIES[i], label=row.case)
+    ax.set_xticks(range(len(FYS)), fx)
+    ax.set_ylabel("₹ lakh per year", color=charts.INK_2)
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    charts.title(ax, "The court case moves the answer more than any other setting",
+                 "Annual loss with the GBM median schedule under each alternative")
+    charts.save(fig, FIG / "sensitivity.png")
 
     (OUT / "headline.json").write_text(json.dumps(head, indent=2, default=float) + "\n")
     (ROOT / "docs" / "ANALYSIS.md").write_text("\n".join(md))

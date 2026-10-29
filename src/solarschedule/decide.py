@@ -3,11 +3,12 @@ schedule percentile, a battery that absorbs deviations, and pooling.
 
 Inputs are per-block frames from scripts/backtest.py (MW, mean over the
 block). Energies passed to the loss calculator are MWh per block.
-Parameters and their sources: docs/DECISIONS.md.
+Parameters and their sources are in the comments below.
 """
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import brentq
 
 from solarschedule.loss import BLOCK_HOURS, settle
 from solarschedule.plant import CAPACITY_MW
@@ -23,6 +24,12 @@ CONTRACT_RANGE = (2.82, 4.79)
 BESS_RS_LAKH_PER_MW_MONTH = (1.48, 2.10)
 BESS_HOURS = 2.0
 ROUND_TRIP = 0.88
+
+# QCA forecasting and scheduling fee, Rs per MW per month: GSECL's 75 MW
+# solar QCA tender (2021), estimated Rs 6.96 lakh for 24 months. The only
+# public per-MW figure found; awards are not published, so build vs buy is
+# read as a break-even.
+QCA_FEE_RS_PER_MW_MONTH = 3870
 
 
 def annual_loss_lakh(df: pd.DataFrame, schedule_mw, regime: Regime,
@@ -43,6 +50,24 @@ def best_quantile(df: pd.DataFrame, regime: Regime, quantiles: list[str]) -> tup
     """The quantile column with the lowest annual loss on `df`, and all losses."""
     losses = {q: annual_loss_lakh(df, df[q], regime) for q in quantiles}
     return min(losses, key=losses.get), losses
+
+
+def qca_saving(df: pd.DataFrame, schedule_mw, regime: Regime, cut: float) -> float:
+    """Rs lakh per year saved if a QCA's error is `cut` (0-1) smaller than
+    ours in every block (its schedule moved that much closer to actual)."""
+    s = np.asarray(schedule_mw, dtype=float)
+    better = df.actual.to_numpy() + (1 - cut) * (s - df.actual.to_numpy())
+    return annual_loss_lakh(df, s, regime) - annual_loss_lakh(df, better, regime)
+
+
+def qca_breakeven_cut(df: pd.DataFrame, schedule_mw, regime: Regime,
+                      fee: float = QCA_FEE_RS_PER_MW_MONTH) -> float:
+    """Smallest error cut (0-1) at which the saving pays a fee of `fee`
+    Rs/MW/month; NaN if even a perfect forecast would not."""
+    need = fee * CAPACITY_MW * 12 / 1e5
+    if qca_saving(df, schedule_mw, regime, 1.0) < need:
+        return float("nan")
+    return float(brentq(lambda c: qca_saving(df, schedule_mw, regime, c) - need, 0.0, 1.0, xtol=1e-4))
 
 
 def battery(gen_mw, sched_mw, regime: Regime, energy_mwh: float,

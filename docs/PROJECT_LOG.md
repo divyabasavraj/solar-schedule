@@ -1,5 +1,27 @@
 # Project log
 
+## 28–29 Oct 2026: Milestones 4 (forecast ladder) and 5 (decision analysis) ✅
+**Done when (4):** all 4 models backtested walk-forward; MAE/RMSE/₹ loss table by season; SHAP plot.
+**Done when (5):** all 7 analyses have a ₹ number and a chart; A, B, C, D, M and W in PLAN §13 filled in.
+
+- **Backtest** (`docs/BACKTEST.md`): 839 days, 01.07.2024 – 19.10.2026, monthly refit. Lead 2 is the base case, lead 1 the optimistic bound. GBM q50 MAE 5.83% of capacity vs 7.38% for the best free NWP (ECMWF) and 8.61% for persistence.
+- **LightGBM swapped** for scikit-learn `HistGradientBoostingRegressor`: LightGBM's macOS wheel would not find `libomp`. Same quantile loss, same SHAP support.
+- **Decision analysis** (`docs/ANALYSIS.md`, 8 charts in `docs/figures/`). Out-of-sample = days after 07.2025; the optimiser chooses on the earlier year.
+  - A ₹316 lakh/yr (free NWP, FY26-27) → B ₹201 lakh (GBM + optimiser): **D = 36%**, 41% by FY31-32. C ₹607 → ₹356 lakh by FY31-32.
+  - Optimiser: the best percentile moves from the median to P60 by X = 0, but saves little over the median.
+  - **Insight 3 not supported:** low-schedule blocks carry 0.6% → 6.3% of loss; monsoon ~60%. Shoulder-hour share doubles (15% → 32%).
+  - Build vs buy: **W ≈ 11%** (FY26-27) falling to 9% (FY31-32), against ₹3,870/MW/month (GSECL 2021 QCA tender estimate, the only public per-MW figure).
+  - Battery: **M = never** by FY31-32 for 5, 10 or 20 MWh; the 10 MWh needs a lease of ₹0.61 lakh/MW/month (41% of today's lowest tender).
+  - Pooling with a neighbour 25 km away: 9% saving (upper bound; error correlation 0.83).
+  - Sensitivity: litigation (DSM 2014) cuts the loss to ₹14 lakh/yr, the largest swing; contract rate ₹4.79 scales it by 1.7×.
+- **89 tests pass** (3 new for the QCA break-even).
+
+**Carried forward**
+- Live forecasts issued before the gate start 29 Oct only (28 Oct was missed while the cron fix went in), so milestone 6 will have ~5 days by 3 Nov, not ~10.
+- Re-check court status before shipping (week of 4 Nov).
+
+**Next: milestone 6 (2–3 Nov).** Next-day scoring and the weekly report.
+
 ## 21 Oct 2026: Milestone 2 (data and daily cron) ✅, a day early
 **Done when:** Parquet files in DuckDB with no gaps (or gaps logged); cron has run twice successfully.
 

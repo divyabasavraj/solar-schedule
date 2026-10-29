@@ -50,3 +50,27 @@ def test_battery_cuts_loss_on_noisy_days():
 def test_bess_cost_two_hour():
     lo, hi = decide.bess_cost_lakh_per_year(10)  # 5 MW
     assert lo == pytest.approx(5 * 1.48 * 12) and hi == pytest.approx(5 * 2.10 * 12)
+
+
+def _noisy_days(n_days=10, seed=2):
+    rng = np.random.default_rng(seed)
+    sched = np.tile(np.clip(80 * np.sin(np.linspace(0, np.pi, 96)), 0, None), n_days)
+    gen = np.clip(sched + rng.normal(0, 8, len(sched)) * (sched > 0), 0, 100)
+    return pd.DataFrame({"actual": gen, "day": np.repeat(np.arange(n_days), 96)}), sched
+
+
+def test_qca_saving_ends():
+    df, sched = _noisy_days()
+    assert decide.qca_saving(df, sched, FY32, 0.0) == pytest.approx(0)
+    assert decide.qca_saving(df, sched, FY32, 1.0) == pytest.approx(decide.annual_loss_lakh(df, sched, FY32))
+
+
+def test_qca_breakeven_recovers_the_cut():
+    df, sched = _noisy_days()
+    fee = decide.qca_saving(df, sched, FY32, 0.3) * 1e5 / 100 / 12  # Rs/MW/month a 30% cut is worth
+    assert decide.qca_breakeven_cut(df, sched, FY32, fee) == pytest.approx(0.3, abs=1e-3)
+
+
+def test_qca_breakeven_nan_when_fee_beyond_perfect_forecast():
+    df, sched = _noisy_days()
+    assert np.isnan(decide.qca_breakeven_cut(df, sched, FY32, fee=1e9))

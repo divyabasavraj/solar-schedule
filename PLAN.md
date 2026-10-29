@@ -55,6 +55,11 @@ Plants either forecast in-house or pay a **Qualified Coordinating Agency (QCA)**
 3. **Low-output blocks become dangerous at X = 0.** Early morning, late evening and cloudy blocks have a small schedule, so even small MWh errors become huge percentages. Expect most future losses to come from these blocks, which is where a battery or better short-horizon forecasting earns its money.
 4. **The cost grows every year to 2031** even if forecast accuracy stays the same: the "cost of standing still" is a number the CFO needs.
 
+**What the numbers said (milestone 5, `docs/ANALYSIS.md`):**
+- Insight 2 holds, but it is small. The out-of-sample best year-round percentile moves from the median (FY26-27) to P60 (FY31-32), and the seasonal optimiser saves only 1–10 lakh a year over the median. Scheduling the median is nearly as good.
+- Insight 3 is **not supported as written**. Blocks scheduled below 20 MW carry 0.6% of the loss now and 6.3% at X = 0. The shoulder hours' share doubles (15% → 32%), but midday still costs most, and about 60% of the loss falls in the monsoon. Cloudy days drive the loss, not small schedules.
+- Insight 4 holds: with the same forecast, the loss grows from ₹202 lakh (FY26-27) to ₹360 lakh (FY31-32).
+
 ## 4. Data (all free)
 | Data | What it gives | Use | Status |
 |---|---|---|---|
@@ -83,7 +88,7 @@ Day-ahead forecast of 96 blocks for tomorrow, using only information available a
 | 1 | **Persistence:** tomorrow = today | The number to beat |
 | 2 | **Clear-sky × forecast cloud factor** | Simple, explainable physics baseline |
 | 3 | **Day-ahead weather forecast → plant model** (`pvlib`) | What a plant gets almost for free |
-| 4 | **LightGBM** on day-ahead weather forecasts, sun position, time of day, season, recent errors, with **quantile versions** (10th–90th percentile) | The ML model, and the forecast ranges the optimiser needs |
+| 4 | **Gradient-boosted trees** (scikit-learn HistGradientBoosting; LightGBM would not load on macOS) on day-ahead weather forecasts, sun position, time of day, season, recent errors, with **quantile versions** (10th–90th percentile) | The ML model, and the forecast ranges the optimiser needs |
 
 - **Testing:** walk-forward backtest over 2+ years (train on the past, test on the next month, roll forward); never a random split
 - **Metrics:** MAE and RMSE as % of capacity, error by season (monsoon vs dry), and **₹ deviation loss**, which is what matters
@@ -124,9 +129,9 @@ Full scope, nothing cut. About 15 working days across 20 Oct – 7 Nov, with 2 d
 |---|---|---|---|
 | 1 ✅ | **Rules:** fetch CERC's X order and the Third Amendment, confirm X path and litigation status; build the loss calculator + unit tests (done 21 Oct; see `docs/PROJECT_LOG.md`) | 20–21 Oct | Every band × side × regime has a hand-worked test that passes; open decisions on X path, amendment and litigation are closed with citations |
 | 2 ✅ | **Data:** pull 2+ years of Open-Meteo archive + day-ahead forecasts for Pavagada; download Kaggle plant data; **start the daily cron** (done 21 Oct; first scheduled run 22 Oct 09:00 IST) | 22–23 Oct | Parquet files in DuckDB with no gaps (or gaps logged); cron has run twice successfully |
-| 3 | **Plant model:** `pvlib` calibrated on Kaggle data; data-quality report | 24 Oct | Calibration error reported; data-quality report written |
-| 4 | **Forecast ladder + walk-forward backtest** | 25–27 Oct | All 4 models backtested walk-forward; MAE/RMSE/₹ loss table by season; SHAP plot |
-| 5 | **Decision analysis:** cost to 2031, schedule optimiser, where the money goes, build vs buy, battery, aggregation, sensitivity | 28 Oct – 1 Nov | All 7 analyses have a ₹ number and a chart; the numbers for A, B, C, D, M and W in section 13 are filled in |
+| 3 ✅ | **Plant model:** `pvlib` calibrated on Kaggle data; data-quality report | 24 Oct | Calibration error reported; data-quality report written |
+| 4 ✅ | **Forecast ladder + walk-forward backtest** (done 28 Oct; `docs/BACKTEST.md`) | 25–27 Oct | All 4 models backtested walk-forward; MAE/RMSE/₹ loss table by season; SHAP plot |
+| 5 ✅ | **Decision analysis:** cost to 2031, schedule optimiser, where the money goes, build vs buy, battery, aggregation, sensitivity (done 29 Oct; `docs/ANALYSIS.md`) | 28 Oct – 1 Nov | All 7 analyses have a ₹ number and a chart; the numbers for A, B, C, D, M and W in section 13 are filled in |
 | 6 | **Live loop:** daily forecast, next-day scoring, weekly report (AI-written, code-checked) | 2–3 Nov | First weekly report generated automatically from ~10 days of live data, every number checked |
 | 7 | **Ship:** decision memo, Streamlit dashboard, README (decision and ₹ answer first), AI log, limitations | 4–5 Nov | Dashboard live on HF Spaces; memo reviewed end to end |
 | — | **Buffer + final review + LinkedIn post** | 6–7 Nov | Fresh-eyes read of README and memo; post published |
@@ -142,16 +147,19 @@ Starting the cron in milestone 2 means about two weeks of real live forecasts ha
 - Contract rate is a parameter; results shown across a range
 
 ## 13. Interview story
-"CERC is tightening deviation rules for solar plants every year until 2031, and it's being fought in court. I modelled a 100 MW plant at Pavagada and built a day-ahead forecast, from a persistence baseline up to a LightGBM quantile model, tested walk-forward over two years. Then I turned it into decisions. The common belief is 'under-promise because shortfalls cost more', but the regulation's charges are roughly symmetric in ₹; the real risk is the new formula, which makes low-output blocks very expensive as X falls to zero. With the same forecast quality, deviation losses grow from ₹A lakh this year to ₹C lakh by 2031; my model and schedule optimiser cut that by D%, a QCA is only worth it if they beat my error by W%, and a 10 MWh battery pays back from year M. It runs live every day and scores itself."
+"CERC is tightening deviation rules for solar plants every year until 2031, and it's being fought in court. I modelled a 100 MW plant at Pavagada and built a day-ahead forecast, from a persistence baseline up to a quantile gradient-boosted model, tested walk-forward over two years. Then I turned it into decisions. With the free weather forecast, deviation losses are ₹316 lakh a year now (A); my model cuts that to ₹201 lakh (B), a 36% cut (D), and the cut grows to 41% by 2031, when the free forecast would cost ₹607 lakh against my ₹356 lakh (C). I expected the losses to move to low-output blocks as X falls; the data said no. Cloudy monsoon days carry 60% of the loss, and small schedules only 6%. A QCA is worth its fee only if it beats my error by about 11% (W), and a deviation-only battery never pays back (M): storage would have to get 60% cheaper. Pooling with a neighbour saves at most 9%. If the court case succeeds, the loss falls to ₹14 lakh and none of this matters, which is why the regime is a setting, not an assumption. It runs live every day and scores itself."
+
+Sources for every number: `data/derived/headline.json`, generated by `scripts/analysis.py`.
 
 ## 14. Open decisions
 - [x] X path: 100/90/75/55/30/0 (order 9/SM/2025 para 84(a)); 80/60/40/20 was the draft
 - [x] Third Amendment (31.08.2026): does not apply to an existing plant (Reg 8(4A) covers only bids from 01.01.2027 or COD from 01.01.2029)
 - [x] Litigation: interim relief for petitioners only, as of CERC's SOR of 25.08.2026; modelled as the DSM 2014 sensitivity. **Re-check before shipping**
+- [ ] QCA fee: only public per-MW figure is GSECL's 2021 tender estimate (₹3,870/MW/month); build vs buy is shown as a break-even curve
 - [ ] Plant is assumed ISTS-connected (CERC DSM); if state-connected, KERC DSM 2026 would apply instead (state in README)
-- [ ] Contract rate range for Pavagada PPAs
+- [x] Contract rate range for Pavagada PPAs: ₹2.82/kWh base (SECI 2018 award to SB Energy), ₹4.79 high (NTPC 2016 awards)
 - [ ] Dashboard: Streamlit (proposed) vs Power BI
-- [ ] Backtest lead time: `_previous_day2` as base (honest), `_previous_day1` as optimistic bound (proposed in `docs/DATA.md`; decide in milestone 4)
+- [x] Backtest lead time: `_previous_day2` as base, `_previous_day1` as optimistic bound (decided in milestone 4)
 
 ## 15. Sources
 - **Primary texts, read directly and archived in `docs/sources/`; full list in `docs/RULES.md` §5**
