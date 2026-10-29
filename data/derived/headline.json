@@ -1,0 +1,80 @@
+{
+  "A_loss_fy27_free_nwp": 315.8,
+  "B_loss_fy27_model_opt": 201.2,
+  "C_loss_fy32_free_nwp": 607.3,
+  "C_loss_fy32_model_opt": 355.6,
+  "D_cut_fy27_pct": 36.3,
+  "D_cut_fy32_pct": 41.4,
+  "loss_fy26_old_bands_model": 110.96971148183874,
+  "loss_one_percentile": {
+    "FY26-27": 202.5,
+    "FY27-28": 212.2,
+    "FY28-29": 228.2,
+    "FY29-30": 253.0,
+    "FY30-31": 291.5,
+    "FY31-32": 359.5
+  },
+  "one_percentile": {
+    "FY26-27": "q50",
+    "FY27-28": "q50",
+    "FY28-29": "q50",
+    "FY29-30": "q50",
+    "FY30-31": "q50",
+    "FY31-32": "q50"
+  },
+  "revenue_lakh_per_year": 6370.0,
+  "low_block_loss_share_2026": 0.6,
+  "low_block_energy_share_2026": 4.0,
+  "season_share_2026": {
+    "monsoon": 60.7,
+    "post-monsoon": 21.0,
+    "summer": 6.6,
+    "winter": 11.7
+  },
+  "low_block_loss_share_2031": 6.3,
+  "low_block_energy_share_2031": 3.4,
+  "season_share_2031": {
+    "monsoon": 62.4,
+    "post-monsoon": 19.3,
+    "summer": 7.5,
+    "winter": 10.7
+  },
+  "qca_fee_ceiling_10pct_fy27": 3470.0,
+  "qca_fee_ceiling_10pct_fy32": 4340.0,
+  "battery": [
+    {
+      "battery": "5 MWh / 2.5 MW",
+      "FY26-27": 12.1,
+      "FY27-28": 13.0,
+      "FY28-29": 12.1,
+      "FY29-30": 14.0,
+      "FY30-31": 17.3,
+      "FY31-32": 22.4,
+      "lease cost \u20b9 lakh/yr": "44\u201363",
+      "first FY savings \u2265 low cost": "not by FY31-32"
+    },
+    {
+      "battery": "10 MWh / 5 MW",
+      "FY26-27": 21.7,
+      "FY27-28": 23.2,
+      "FY28-29": 21.4,
+      "FY29-30": 24.8,
+      "FY30-31": 30.4,
+      "FY31-32": 36.8,
+      "lease cost \u20b9 lakh/yr": "89\u2013126",
+      "first FY savings \u2265 low cost": "not by FY31-32"
+    },
+    {
+      "battery": "20 MWh / 10 MW",
+      "FY26-27": 37.1,
+      "FY27-28": 39.9,
+      "FY28-29": 36.7,
+      "FY29-30": 41.8,
+      "FY30-31": 50.3,
+      "FY31-32": 57.4,
+      "lease cost \u20b9 lakh/yr": "178\u2013252",
+      "first FY savings \u2265 low cost": "not by FY31-32"
+    }
+  ],
+  "litigation_loss_lakh": 14.4
+}
